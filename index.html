@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Chat</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+      .container{
+        max-width: 100%;
+        width: 100%;
+      }
+      .card{
+        margin-top: 1%;
+        display: inherit;
+      }
+      #messageArea {
+        display:none;
+      }
+      #chat {
+        overflow: auto;
+      }
+      #username, #password {
+        max-width: 300px;
+        text-align: -webkit-center;
+      }
+      #userForm, #newUser {
+        margin: 2%;
+        text-align: -webkit-center;
+      }
+      #logout{
+        float: right;
+      }
+      #menuBar h5{
+        color: white;
+        display: inline-block;
+        font-weight: bold;
+      }
+      #menuBar{
+        width: 100%;
+        background-color: #3d3d3d;
+        margin-bottom: 2%;
+        padding: .5%;
+      }
+      .trashIcon{
+        width: 20px;
+        float: right;
+      }
+    </style>
+</head>
+<body>
+  <div id="userArea" class="row">
+    <div class="col-md-12">
+      <form id="userForm">
+        <div class="form-group">
+          <label>Enter Your Login:</label>
+          <input class="form-control" id="username"></input>
+          <br />
+          <input class="form-control" id="password" style="-webkit-text-security: disc !important;"></input>
+          <br />
+          <div id="login">
+            <input type="submit" class="btn btn-primary" value="Login" />
+          </div>
+        </div>
+      </form>
+      <form id="newUser">
+        <div class="form-group">
+          <input type="submit" class="btn btn-secondary" value="Create An Account" id="newUserBtn"/>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="row" id="messageArea">
+      <div id="menuBar">
+        <h5 id="menuBarStatus"></h5><h5 id="menuBarUsername"></h5>
+        <form id="logout">
+          <input type="submit" class="btn btn-primary" value="Logout"/>
+        </form>
+      </div>
+      <div class="col-md-3">
+        <div class="card bg-light p-3">
+          <h3>Online Users</h3>
+          <ul class="list-group" id="users"></ul>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <div class="chat" id="chat"></div>
+        <form id="messageForm">
+          <div class="form-group">
+            <label>Enter Your Message:</label>
+            <textarea rows="1" class="form-control" id="message"></textarea>
+            <br />
+            <input type="submit" class="btn btn-primary" value="Send Message" />
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    $(function()
+    {
+      const socket = io();
+      const $message = $('#message');
+      const $chat = $('#chat');
+      const $messageArea = $('#messageArea');
+      var $messageForm = $('#messageForm');
+      var $userArea = $('#userArea');
+      var $userForm = $('#userForm');
+      var $users = $('#users');
+      var $username = $('#username');
+      var $password = $('#password');
+      var $login = $('#login');
+      var $logout = $('#logout');
+      var $newUser = $('#newUser');
+      var $menuBar = $('#menuBar');
+      var $menuBarUsername = $('#menuBarUsername');
+      var $menuBarStatus = $('#menuBarStatus');
+      var $adminStatusElement = $('#adminStatusElement');
+      var socketstatus;
+      var previousTime_Stamp = [];
+      var previousUsername = []
+      var previousMessage = [];
+      var previousMessageID = [];
+      var logout = false;
+      var isAdmin = false;
+
+      //resizes window automaticlly (DOES NOT WORK)
+      $(document).ready(function()
+      {
+        $(window).resize(function()
+        {
+          $chat.css('max-height', $(window).height()*0.6 + 'px');
+          $users.css('max-height', $(window).height()*0.3 + 'px');
+          $menuBar.css('max-height', $(window).height()*0.1 + 'px');
+        });
+      });
+
+      //Sets the Shown Username and Status
+      socket.on('connect', function()
+      {
+        socketStatus = 'Connected';
+        document.getElementById('menuBarStatus').innerHTML = socketStatus + ':&nbsp';
+        document.getElementById('menuBarStatus').style.color = '#01bc0b';
+        socket.emit('username', $username.val())
+      });
+      socket.on('disconnect', function()
+      {
+        socketStatus = 'Disconnected';
+        document.getElementById('menuBarStatus').innerHTML = socketStatus + ':&nbsp';
+        document.getElementById('menuBarStatus').style.color = 'red';
+      });
+
+      //Hide Login Form When username is Entered
+      $userForm.submit(function(e)
+      {
+        e.preventDefault();
+        socket.emit('username', $username.val());
+        socket.emit('password', $password.val());
+        socket.emit('auth');
+      });
+
+      //Checking Login Credentials
+      socket.on('authGood', function(data)
+      {
+        if (data == $username.val())
+        {
+          $userArea.hide();
+          $messageArea.show();
+          $chat.css('max-height', $(window).height()*0.6 + 'px');
+          $users.css('max-height', $(window).height()*0.3 + 'px');
+          $menuBar.css('max-height', $(window).height()*0.1 + 'px');
+          if (isAdmin)
+            document.getElementById('menuBarUsername').innerHTML = $username.val() + "  (Admin Privileges)";
+          else
+            document.getElementById('menuBarUsername').innerHTML = $username.val();
+          document.getElementById('messageArea').style.display = 'flex';
+        }
+      });
+      socket.on('authBad', function(data)
+      {
+        if (data == $username.val())
+        {
+          window.alert('Bad Authentication');
+          $password.val('');
+        }
+      });
+      
+      //Give administrator privlages to account with proper credentials
+      socket.on('isAdmin', function(data){
+        if (data == $username.val())
+          isAdmin = true;
+      });
+
+      //Show usernames Currently Connected
+      socket.on('get users', function(data)
+      {
+        $users.empty();
+        for (i = 0; i < data.length; i++)
+        {
+          $users.append('<li class="list-group-item">'+data[i]+'</li>');
+        }
+      });
+
+      //Logout Back To Initial PAge
+      $logout.submit(function(e)
+      {
+        e.preventDefault();
+        socket.emit('logout', $username.val());
+        logout = true;
+        isAdmin = false;
+        $userArea.show();
+        $messageArea.hide();
+        $username.val('');
+        $password.val('');
+      });
+
+      //Pulls Old Chat Data
+      socket.on('previousTime_Stamp', function(data)
+      {
+        previousTime_Stamp = data;
+      });
+      socket.on('previousUsername', function(data)
+      {
+        previousUsername = data;
+      });
+      socket.on('previousMessageID', function(data){
+        previousMessageID = data;
+      });
+      socket.on('previousMessage', function(data)
+      {
+        if (!logout)
+        {
+          previousMessage = data;
+          if (isAdmin)
+            $chat.append('<div class="card bg-light p-3" id="message'+ previousMessageID +'">' + previousTime_Stamp.substring(11, 19) + ' -- ' + previousUsername + ': ' + previousMessage + '<img class="trashIcon" onClick="deleteMessage('+ previousMessageID +');" src="https://cdn.onlinewebfonts.com/svg/img_449334.png"/></div>');
+          else
+            $chat.append('<div class="card bg-light p-3" id="message'+ previousMessageID +'">' + previousTime_Stamp.substring(11, 19) + ' -- ' + previousUsername + ': ' + previousMessage + '</div>');
+          $chat.scrollTop($chat.prop("scrollHeight"));
+        }
+      });
+
+      //Send Message
+      $messageForm.submit(function(e)
+      {
+        e.preventDefault();
+        socket.emit('send message', Date().slice(16,25) + ' -- ' + $username.val() + ': ' + $message.val());
+        $message.val('');
+      });
+
+      //Receive Message
+      socket.on('new message', function(data)
+      {
+        if (isAdmin)
+          $chat.append('<div class="card bg-light p-3" id="message'+ data.id +'">' + data.msg + '<img class="trashIcon" onClick="deleteMessage('+ data.id +');" src="https://cdn.onlinewebfonts.com/svg/img_449334.png"/></div>');
+        else
+          $chat.append('<div class="card bg-light p-3" id="message'+ data.id +'">' + data.msg + '</div>');
+        $chat.scrollTop($chat.prop("scrollHeight"));
+      });
+
+      //Enter Key Will Send Message
+      $message.keypress(function (e)
+      {
+        if(e.which == 13 && !e.shiftKey)
+        {
+          e.preventDefault();
+          socket.emit('send message', $message.val());
+          $message.val('');
+          return false;
+        }
+      });
+
+      //Send User to New User Page
+      $newUser.submit(function (e)
+      {
+        e.preventDefault();
+        location.replace("../newUser");
+        $userArea.hide();
+      });
+    });
+
+    function deleteMessage(data){
+      const socket = io();
+
+      socket.emit('deleteMessage', data);
+      document.getElementById('message'+ data +'').remove();
+    };
+  </script>
+</body>
+</html>

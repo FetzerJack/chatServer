@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Chat</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+      body {
+        margin: 30px;
+      }
+      #messageArea {
+        display:none;
+      }
+      #chat {
+        overflow: auto;
+        max-height: 400px;
+      }
+
+      #username, #password {
+        max-width: 300px;
+        text-align: -webkit-center;
+      }
+      #userForm {
+        text-align: -webkit-center;
+      }
+    </style>
+</head>
+<body>
+  <div id="userArea" class="row">
+    <div class="col-md-12">
+      <form id="userForm">
+        <div class="form-group">
+          <label id="test">Create a New User Account:</label>
+          <input class="form-control" id="username"></input>
+          <br />
+          <input class="form-control" id="password"></input>
+          <br />
+          <input type="submit" class="btn btn-primary" value="Create Account" />
+        </div>
+      </form>
+    </div>
+  </div>
+
+    <script>
+      $(function()
+      {
+        var socket = io();
+        var $username = $('#username');
+        var $password = $('#password');
+        var $userForm = $('#userForm');
+
+        //Sends new User data to Server
+        $userForm.submit(function(e)
+        {
+            e.preventDefault();
+            socket.emit('newUsername', $username.val());
+            socket.emit('newPassword', $password.val());
+        });
+
+        socket.on("newUserGood", function(data)
+        {
+          if (data == $username.val())
+          {
+            window.alert('New Account Created. Please Login.');
+            location.replace("../index");
+          }
+        });
+
+        //So, where do we begin? We know that the function is looping muliple times
+        //depending on the number of times the empty field is sent. This error has
+        //been isolated to here. We have traced the error from the server to here. We tried to
+        //reset values. The only waywe know of to fix this is comment out e.preventdefault();
+        //This causes the page to reload and break the cycle.
+        socket.on("newUserError", function(data)
+        {
+          if (data == $username.val())
+          {
+            window.alert('Enter Username and Password');
+            $username.val('');
+            $password.val('');
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
