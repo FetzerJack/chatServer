@@ -245,9 +245,17 @@
       //Send Message
       $messageForm.submit(function(e)
       {
-        e.preventDefault();
-        socket.emit('send message', Date().slice(16,25) + ' -- ' + $username.val() + ': ' + $message.val());
-        $message.val('');
+        if ($message.val().length < 20)
+        {
+          e.preventDefault();
+          socket.emit('send message', Date().slice(16,25) + ' -- ' + $username.val() + ': ' + $message.val());
+          $message.val('');
+        }
+        else
+        {
+          window.alert("Messages must being less than 512 characters.");
+          $message.val('');
+        }
       });
 
       //Receive Message

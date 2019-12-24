@@ -151,11 +151,11 @@ io.sockets.on('connection', function(socket)
   {
     sqlConnection.query('SELECT * FROM users', function(err, rows, fields) 
     {
-      var found = false;
       i = 0;
+      var found = false;
       if ((socket.username).length >= 4 && (socket.password).length >= 4)
       {
-        while (i < rows.length || !found)
+        while (i < rows.length)
         {
           if (socket.username == (rows[i].username) && socket.password == (rows[i].password) && rows[i].status == 1)
           {
